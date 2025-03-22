@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar, User } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Icons } from "@/components/icons"
 
 interface Barber extends UserData {
   id: string
@@ -85,10 +86,23 @@ export default function ClientDashboard() {
               Encuentra al mejor barbero para tu estilo
             </p>
           </div>
-          <Button onClick={() => router.push('/client/profile')}>
-            <User className="mr-2 h-4 w-4" />
-            Mi Perfil
-          </Button>
+          <div className="flex flex-col md:flex-row gap-4">
+            <Button
+              className="flex-1"
+              onClick={() => router.push('/client/appointments')}
+            >
+              <Icons.calendar className="mr-2 h-4 w-4" />
+              Mis Citas
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => router.push('/client/profile')}
+            >
+              <Icons.user className="mr-2 h-4 w-4" />
+              Mi Perfil
+            </Button>
+          </div>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
