@@ -3,10 +3,14 @@
 import Link from "next/link"
 import { Scissors } from "lucide-react"
 import { AnimatedButton } from "@/components/ui/animated-button"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
+      <header className="container flex h-16 items-center justify-end px-4">
+        <ThemeToggle />
+      </header>
       <main className="flex-1">
         <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">
           <div className="container px-4 md:px-6">
@@ -20,17 +24,17 @@ export default function Home() {
                 </p>
               </div>
               <div className="grid w-full max-w-sm gap-4">
-                <Link href="/auth/login">
+                <Link href="/login">
                   <AnimatedButton className="w-full">
                     Iniciar Sesión
                   </AnimatedButton>
                 </Link>
-                <Link href="/auth/register/client">
+                <Link href="/register/client">
                   <AnimatedButton variant="outline" className="w-full">
                     Registrarse como Cliente
                   </AnimatedButton>
                 </Link>
-                <Link href="/auth/register/barber">
+                <Link href="/register/barber">
                   <AnimatedButton variant="outline" className="w-full">
                     Registrarse como Barbero
                   </AnimatedButton>
