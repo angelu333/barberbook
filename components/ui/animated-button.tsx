@@ -13,20 +13,25 @@ const AnimatedButton = React.forwardRef<HTMLButtonElement, AnimatedButtonProps>(
     return (
       <button
         className={cn(
-          "relative inline-flex w-full items-center justify-center overflow-hidden rounded-lg transition-all",
-          "before:absolute before:inset-0 before:animate-[gradient_4s_ease-in-out_infinite] before:bg-[length:200%_200%] before:bg-[linear-gradient(90deg,theme(colors.primary.DEFAULT/0.5),theme(colors.primary.DEFAULT/0.2),theme(colors.primary.DEFAULT/0.5))] before:opacity-70 before:blur-xl",
+          "group relative inline-flex w-full items-center justify-center overflow-hidden rounded-lg transition-all",
+          "before:absolute before:inset-0 before:animate-[gradient_4s_ease-in-out_infinite] before:bg-[length:200%_200%] before:bg-gradient-to-r before:from-indigo-500 before:via-purple-500 before:to-pink-500 before:opacity-100 before:blur-xl before:transition-all",
           "after:absolute after:inset-[2px] after:rounded-[7px] after:transition-all",
           variant === "default" 
-            ? "after:bg-primary text-primary-foreground hover:before:opacity-100" 
-            : "after:bg-background text-foreground hover:before:opacity-85",
+            ? "after:bg-primary hover:after:bg-primary/90" 
+            : "after:bg-background hover:after:bg-background/90",
           size === "default" ? "h-14 px-6 text-lg" : "h-16 px-8 text-xl",
-          "font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]",
+          "font-semibold shadow-lg transition-all hover:scale-[1.02] hover:shadow-xl active:scale-[0.98]",
           className
         )}
         ref={ref}
         {...props}
       >
-        <span className="relative">{children}</span>
+        <span className={cn(
+          "relative z-10",
+          variant === "default" ? "text-primary-foreground" : "text-foreground"
+        )}>
+          {children}
+        </span>
       </button>
     )
   }

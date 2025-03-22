@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-export default function LoginPage() {
+export default function RegisterClientPage() {
   return (
     <div className="container flex h-screen w-screen flex-col items-center justify-center">
       <Link
@@ -23,12 +23,20 @@ export default function LoginPage() {
       <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
         <Card className="border-primary/20">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl text-center">Iniciar Sesión</CardTitle>
+            <CardTitle className="text-2xl text-center">Registro de Cliente</CardTitle>
             <CardDescription className="text-center">
-              Ingresa tus credenciales para continuar
+              Crea tu cuenta para agendar citas
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Nombre Completo</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Juan Pérez"
+              />
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -38,21 +46,35 @@ export default function LoginPage() {
               />
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="phone">Teléfono</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="+1234567890"
+              />
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="password">Contraseña</Label>
               <Input
                 id="password"
                 type="password"
               />
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="confirm-password">Confirmar Contraseña</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+              />
+            </div>
           </CardContent>
           <CardFooter>
             <Button className="w-full">
-              Iniciar Sesión
+              Registrarse
             </Button>
           </CardFooter>
         </Card>
       </div>
     </div>
   )
-}
-
+} 
