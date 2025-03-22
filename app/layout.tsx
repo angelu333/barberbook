@@ -3,19 +3,20 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "sonner"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "BarberBook - Sistema de Citas para Barberías",
-  description: "Reserva tu cita con los mejores barberos de manera fácil y rápida",
+  title: "BarberBook - Tu barbería en línea",
+  description: "Agenda citas con los mejores barberos de tu zona",
 }
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
   return (
     <html lang="es" suppressHydrationWarning>
       <body className={inter.className}>
@@ -26,6 +27,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <Toaster richColors />
         </ThemeProvider>
       </body>
     </html>

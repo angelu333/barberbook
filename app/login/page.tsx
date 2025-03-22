@@ -9,19 +9,36 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { authenticateUser } from "@/lib/auth"
+import { toast } from "sonner"
 
 export default function LoginPage() {
   const router = useRouter()
+  const [role, setRole] = useState<"client" | "barber">("client")
   const [formData, setFormData] = useState({
     email: "",
     password: ""
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Aquí iría la lógica de autenticación
-    // Por ahora solo redirigimos al dashboard
-    router.push("/client/dashboard")
+    try {
+      const user = authenticateUser(formData.email, formData.password)
+      if (user.role !== role) {
+        toast.error("Este usuario no está registrado como " + (role === "client" ? "cliente" : "barbero"))
+        return
+      }
+      toast.success(`¡Bienvenido ${user.name}!`)
+      // Redirigir según el rol
+      if (role === "client") {
+        router.push("/client/dashboard")
+      } else {
+        router.push("/barber/dashboard")
+      }
+    } catch (error) {
+      toast.error("Credenciales incorrectas")
+    }
   }
 
   return (
@@ -45,6 +62,12 @@ export default function LoginPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
+              <Tabs defaultValue={role} onValueChange={(value) => setRole(value as "client" | "barber")} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="client">Cliente</TabsTrigger>
+                  <TabsTrigger value="barber">Barbero</TabsTrigger>
+                </TabsList>
+              </Tabs>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
