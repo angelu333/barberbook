@@ -8,12 +8,14 @@ import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calendar, User } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface Barber extends UserData {
   id: string
   experience: number
   specialties: string[]
   description: string
+  imageUrl?: string
 }
 
 export default function ClientDashboard() {
@@ -91,12 +93,18 @@ export default function ClientDashboard() {
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {barbers.map((barber) => (
-            <Card key={barber.id}>
-              <CardHeader>
-                <CardTitle>{barber.name}</CardTitle>
-                <CardDescription>
-                  {barber.experience} años de experiencia
-                </CardDescription>
+            <Card key={barber.id} className="overflow-hidden">
+              <CardHeader className="flex flex-row items-center gap-4 p-6">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={barber.imageUrl} />
+                  <AvatarFallback>{barber.name?.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <CardTitle>{barber.name}</CardTitle>
+                  <CardDescription>
+                    {barber.experience} años de experiencia
+                  </CardDescription>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">

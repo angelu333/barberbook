@@ -10,15 +10,23 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Icons } from '@/components/icons'
 import { toast } from 'sonner'
+import { uploadImage } from '@/lib/storage'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+
+interface ExtendedUserData extends UserData {
+  id: string
+  imageUrl?: string
+}
 
 export default function ClientProfile() {
   const router = useRouter()
-  const [user, setUser] = useState<UserData | null>(null)
+  const [user, setUser] = useState<ExtendedUserData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
+    imageUrl: ''
   })
 
   useEffect(() => {
@@ -30,7 +38,7 @@ export default function ClientProfile() {
           return
         }
 
-        const userData = await getUserData(firebaseUser.uid)
+        const userData = await getUserData(firebaseUser.uid) as ExtendedUserData
         if (!userData || userData.role !== 'client') {
           router.push('/login')
           return
@@ -40,6 +48,7 @@ export default function ClientProfile() {
         setFormData({
           name: userData.name || '',
           phone: userData.phone || '',
+          imageUrl: userData.imageUrl || ''
         })
       } catch (error) {
         console.error('Error al cargar perfil:', error)
@@ -51,6 +60,19 @@ export default function ClientProfile() {
 
     loadProfile()
   }, [router])
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+
+    try {
+      const imageUrl = await uploadImage(file, user.id)
+      setFormData({ ...formData, imageUrl })
+      toast.success('Imagen subida correctamente')
+    } catch (error) {
+      toast.error('Error al subir la imagen')
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,6 +87,7 @@ export default function ClientProfile() {
       await updateDoc(doc(db, 'users', firebaseUser.uid), {
         name: formData.name,
         phone: formData.phone,
+        imageUrl: formData.imageUrl,
         updatedAt: new Date().toISOString()
       })
 
@@ -95,6 +118,28 @@ export default function ClientProfile() {
           <h1 className="text-3xl font-bold mb-6">Tu Perfil</h1>
           
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="flex flex-col items-center space-y-4">
+              <Avatar className="h-32 w-32">
+                <AvatarImage src={formData.imageUrl} />
+                <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="flex items-center space-x-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  id="picture"
+                />
+                <Label
+                  htmlFor="picture"
+                  className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+                >
+                  Cambiar Foto
+                </Label>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="email">Correo Electrónico</Label>
               <Input

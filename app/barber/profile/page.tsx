@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { getCurrentUser, getUserData, UserData } from '@/lib/auth'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
@@ -11,10 +12,17 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Icons } from '@/components/icons'
 import { toast } from 'sonner'
+import { uploadImage } from '@/lib/storage'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+
+interface ExtendedUserData extends UserData {
+  id: string
+  imageUrl?: string
+}
 
 export default function BarberProfile() {
   const router = useRouter()
-  const [user, setUser] = useState<UserData | null>(null)
+  const [user, setUser] = useState<ExtendedUserData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
@@ -23,6 +31,7 @@ export default function BarberProfile() {
     experience: 0,
     specialties: '',
     description: '',
+    imageUrl: ''
   })
 
   useEffect(() => {
@@ -34,7 +43,7 @@ export default function BarberProfile() {
           return
         }
 
-        const userData = await getUserData(firebaseUser.uid)
+        const userData = await getUserData(firebaseUser.uid) as ExtendedUserData
         if (!userData || userData.role !== 'barber') {
           router.push('/login')
           return
@@ -47,6 +56,7 @@ export default function BarberProfile() {
           experience: userData.experience || 0,
           specialties: userData.specialties?.join(', ') || '',
           description: userData.description || '',
+          imageUrl: userData.imageUrl || ''
         })
       } catch (error) {
         console.error('Error al cargar perfil:', error)
@@ -58,6 +68,19 @@ export default function BarberProfile() {
 
     loadProfile()
   }, [router])
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+
+    try {
+      const imageUrl = await uploadImage(file, user.id)
+      setFormData({ ...formData, imageUrl })
+      toast.success('Imagen subida correctamente')
+    } catch (error) {
+      toast.error('Error al subir la imagen')
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -75,6 +98,7 @@ export default function BarberProfile() {
         experience: formData.experience,
         specialties: formData.specialties.split(',').map(s => s.trim()).filter(s => s),
         description: formData.description,
+        imageUrl: formData.imageUrl,
         updatedAt: new Date().toISOString()
       })
 
@@ -105,6 +129,28 @@ export default function BarberProfile() {
           <h1 className="text-3xl font-bold mb-6">Tu Perfil Profesional</h1>
           
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="flex flex-col items-center space-y-4">
+              <Avatar className="h-32 w-32">
+                <AvatarImage src={formData.imageUrl} />
+                <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="flex items-center space-x-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  id="picture"
+                />
+                <Label
+                  htmlFor="picture"
+                  className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+                >
+                  Cambiar Foto
+                </Label>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="email">Correo Electrónico</Label>
               <Input
