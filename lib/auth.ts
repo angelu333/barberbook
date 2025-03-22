@@ -1,75 +1,88 @@
-interface User {
-  id: string
-  name: string
-  email: string
-  password: string
-  role: "client" | "barber"
-  phone: string
-  image?: string
-  experience?: number
-  specialties?: string[]
-  description?: string
-  workImages?: string[]
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
+
+export type UserRole = 'client' | 'barber';
+
+export interface UserData {
+  email: string;
+  role: UserRole;
+  name?: string;
+  phone?: string;
+  // Campos específicos para barberos
+  experience?: number;
+  specialties?: string[];
+  description?: string;
+  workImages?: string[];
 }
 
-// Datos de ejemplo (simulando una base de datos)
-export const users: User[] = [
-  {
-    id: "1",
-    name: "Juan Pérez",
-    email: "juan@barber.com",
-    password: "123456",
-    role: "barber",
-    phone: "+1234567890",
-    image: "/barbers/juan.jpg",
-    experience: 5,
-    specialties: ["Corte clásico", "Fade", "Barba"],
-    description: "Especialista en cortes modernos y clásicos",
-    workImages: [
-      "/gallery/juan-1.jpg",
-      "/gallery/juan-2.jpg",
-      "/gallery/juan-3.jpg"
-    ]
-  },
-  {
-    id: "2",
-    name: "María García",
-    email: "maria@barber.com",
-    password: "123456",
-    role: "barber",
-    phone: "+1234567891",
-    image: "/barbers/maria.jpg",
-    experience: 7,
-    specialties: ["Diseño de barba", "Fade", "Cortes texturizados"],
-    description: "Experta en diseños personalizados",
-    workImages: [
-      "/gallery/maria-1.jpg",
-      "/gallery/maria-2.jpg",
-      "/gallery/maria-3.jpg"
-    ]
-  },
-  {
-    id: "3",
-    name: "Carlos López",
-    email: "carlos@cliente.com",
-    password: "123456",
-    role: "client",
-    phone: "+1234567892"
+export const createUser = async (email: string, password: string, role: UserRole, userData: Partial<UserData>) => {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    // Guardar información adicional del usuario en Firestore
+    await setDoc(doc(db, 'users', user.uid), {
+      email,
+      role,
+      ...userData,
+      createdAt: new Date().toISOString()
+    });
+
+    return { user, error: null };
+  } catch (error: any) {
+    return { user: null, error: error.message };
   }
-]
+};
 
-export function authenticateUser(email: string, password: string) {
-  const user = users.find(u => u.email === email && u.password === password)
-  if (!user) {
-    throw new Error("Credenciales incorrectas")
+export const signIn = async (email: string, password: string) => {
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    
+    // Obtener datos adicionales del usuario
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const userData = userDoc.data() as UserData;
+
+    return { user, userData, error: null };
+  } catch (error: any) {
+    return { user: null, userData: null, error: error.message };
   }
-  return user
-}
+};
 
-export function getUserByEmail(email: string) {
-  return users.find(u => u.email === email)
-}
+export const signOut = async () => {
+  try {
+    await firebaseSignOut(auth);
+    return { error: null };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+};
 
-export function getBarbers() {
-  return users.filter(u => u.role === "barber")
-} 
+export const getCurrentUser = (): Promise<FirebaseUser | null> => {
+  return new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      resolve(user);
+    });
+  });
+};
+
+export const getUserData = async (userId: string): Promise<UserData | null> => {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (userDoc.exists()) {
+      return userDoc.data() as UserData;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting user data:', error);
+    return null;
+  }
+}; 
