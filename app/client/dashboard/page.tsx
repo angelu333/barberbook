@@ -3,14 +3,27 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { getCurrentUser, getUserData, UserData } from "@/lib/auth"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Calendar, User } from "lucide-react"
+
+interface Barber extends UserData {
+  id: string
+  experience: number
+  specialties: string[]
+  description: string
+}
 
 export default function ClientDashboard() {
   const router = useRouter()
   const [user, setUser] = useState<UserData | null>(null)
+  const [barbers, setBarbers] = useState<Barber[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function checkAuth() {
+    async function loadDashboard() {
       try {
         const firebaseUser = await getCurrentUser()
         if (!firebaseUser) {
@@ -25,15 +38,28 @@ export default function ClientDashboard() {
         }
 
         setUser(userData)
+
+        // Cargar barberos
+        const barbersQuery = query(
+          collection(db, 'users'),
+          where('role', '==', 'barber')
+        )
+        const barbersSnapshot = await getDocs(barbersQuery)
+        const barbersData = barbersSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as unknown as Barber[]
+        
+        setBarbers(barbersData)
       } catch (error) {
-        console.error('Error al verificar autenticación:', error)
+        console.error('Error al cargar dashboard:', error)
         router.push('/login')
       } finally {
         setLoading(false)
       }
     }
 
-    checkAuth()
+    loadDashboard()
   }, [router])
 
   if (loading) {
@@ -49,30 +75,63 @@ export default function ClientDashboard() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-card rounded-lg shadow-lg p-6 mb-6">
-          <h1 className="text-3xl font-bold mb-4">Bienvenido, {user?.name}</h1>
-          <div className="grid gap-4">
-            <div className="p-4 bg-background rounded-md">
-              <h2 className="text-xl font-semibold mb-2">Información Personal</h2>
-              <div className="space-y-2">
-                <p><span className="font-medium">Email:</span> {user?.email}</p>
-                <p><span className="font-medium">Teléfono:</span> {user?.phone}</p>
-              </div>
-            </div>
-
-            {/* Aquí irán las próximas citas */}
-            <div className="p-4 bg-background rounded-md">
-              <h2 className="text-xl font-semibold mb-2">Próximas Citas</h2>
-              <p className="text-muted-foreground">No tienes citas programadas.</p>
-            </div>
-
-            {/* Aquí irá el historial de citas */}
-            <div className="p-4 bg-background rounded-md">
-              <h2 className="text-xl font-semibold mb-2">Historial de Citas</h2>
-              <p className="text-muted-foreground">No hay historial de citas.</p>
-            </div>
+      <div className="grid gap-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Bienvenido, {user?.name}</h1>
+            <p className="text-muted-foreground">
+              Encuentra al mejor barbero para tu estilo
+            </p>
           </div>
+          <Button onClick={() => router.push('/client/profile')}>
+            <User className="mr-2 h-4 w-4" />
+            Mi Perfil
+          </Button>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {barbers.map((barber) => (
+            <Card key={barber.id}>
+              <CardHeader>
+                <CardTitle>{barber.name}</CardTitle>
+                <CardDescription>
+                  {barber.experience} años de experiencia
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Especialidades:</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {barber.specialties?.map((specialty, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
+                        >
+                          {specialty}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium mb-2">Descripción:</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {barber.description}
+                    </p>
+                  </div>
+
+                  <Button
+                    className="w-full"
+                    onClick={() => router.push(`/client/book/${barber.id}`)}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    Agendar Cita
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     </div>
