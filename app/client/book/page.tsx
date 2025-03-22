@@ -25,9 +25,14 @@ const availableTimes = [
 ]
 
 export default function BookAppointmentPage() {
-  const [date, setDate] = useState<Date>()
-  const [selectedTime, setSelectedTime] = useState<string>()
+  const [date, setDate] = useState<Date | undefined>(undefined)
+  const [selectedTime, setSelectedTime] = useState<string | undefined>(undefined)
   const [showConfirmation, setShowConfirmation] = useState(false)
+
+  const handleConfirm = () => {
+    setShowConfirmation(false)
+    // Aquí iría la lógica para confirmar la reserva
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -96,18 +101,17 @@ export default function BookAppointmentPage() {
           </Button>
         </CardFooter>
       </Card>
-      <BookingConfirmationDialog
-        open={showConfirmation}
-        onOpenChange={setShowConfirmation}
-        date={date!}
-        time={selectedTime!}
-        barberName="Carlos Rodríguez"
-        location="Av. Principal 123, Ciudad"
-        onConfirm={() => {
-          setShowConfirmation(false)
-          // Aquí iría la lógica para confirmar la reserva
-        }}
-      />
+      {date && selectedTime && (
+        <BookingConfirmationDialog
+          open={showConfirmation}
+          onOpenChange={setShowConfirmation}
+          date={date}
+          time={selectedTime}
+          barberName="Carlos Rodríguez"
+          location="Av. Principal 123, Ciudad"
+          onConfirm={handleConfirm}
+        />
+      )}
     </div>
   )
 }
