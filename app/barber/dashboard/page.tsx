@@ -8,11 +8,13 @@ import { collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'fi
 import { db } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Calendar, Clock, User, Check, X } from 'lucide-react'
+import { Calendar, Clock, User, Check, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
-import { format, startOfWeek, addDays } from 'date-fns'
+import { format, startOfWeek, addDays, subWeeks, addWeeks } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Icons } from '@/components/icons'
 
 interface Appointment {
   id: string
@@ -35,6 +37,7 @@ export default function BarberDashboard() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }))
+  const [deleting, setDeleting] = useState(false)
 
   const weekDays = Array.from({ length: 6 }, (_, i) => addDays(currentWeek, i))
 
@@ -109,6 +112,35 @@ export default function BarberDashboard() {
     )
   }
 
+  const navigateWeek = (direction: 'prev' | 'next') => {
+    setCurrentWeek(current => 
+      direction === 'prev' ? subWeeks(current, 1) : addWeeks(current, 1)
+    )
+  }
+
+  const handleDeleteDemoAppointments = async () => {
+    try {
+      setDeleting(true)
+      const demoAppointments = appointments.filter(app => 
+        app.clientName.toLowerCase().startsWith('cliente')
+      )
+
+      await Promise.all(
+        demoAppointments.map(app => 
+          deleteDoc(doc(db, 'appointments', app.id))
+        )
+      )
+
+      toast.success('Citas de ejemplo eliminadas correctamente')
+      loadAppointments()
+    } catch (error) {
+      console.error('Error al eliminar citas:', error)
+      toast.error('Error al eliminar las citas de ejemplo')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -130,72 +162,114 @@ export default function BarberDashboard() {
               Gestiona tus citas y perfil profesional
             </p>
           </div>
-          <Button onClick={() => router.push('/barber/profile')}>
-            <User className="mr-2 h-4 w-4" />
-            Mi Perfil
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="destructive"
+              onClick={handleDeleteDemoAppointments}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <>
+                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <X className="mr-2 h-4 w-4" />
+                  Eliminar Citas de Ejemplo
+                </>
+              )}
+            </Button>
+            <Button onClick={() => router.push('/barber/profile')}>
+              <User className="mr-2 h-4 w-4" />
+              Mi Perfil
+            </Button>
+          </div>
         </div>
 
-        <Tabs defaultValue="calendar">
-          <TabsList>
-            <TabsTrigger value="calendar">Agenda Semanal</TabsTrigger>
-            <TabsTrigger value="appointments">Citas Pendientes</TabsTrigger>
+        <Tabs defaultValue="calendar" className="w-full">
+          <TabsList className="w-full">
+            <TabsTrigger value="calendar" className="flex-1">Agenda</TabsTrigger>
+            <TabsTrigger value="appointments" className="flex-1">Citas Pendientes</TabsTrigger>
           </TabsList>
 
           <TabsContent value="calendar" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>Agenda Semanal</CardTitle>
-                <CardDescription>
-                  Semana del {format(currentWeek, "d 'de' MMMM", { locale: es })}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <div className="min-w-[800px]">
-                    <div className="grid grid-cols-[100px_repeat(6,1fr)] gap-2">
-                      <div className="font-medium">Hora</div>
-                      {weekDays.map(day => (
-                        <div key={day.toString()} className="font-medium text-center">
-                          {format(day, "EEEE d", { locale: es })}
-                        </div>
-                      ))}
-
-                      {timeSlots.map(time => (
-                        <React.Fragment key={time}>
-                          <div className="text-sm py-2">{time}</div>
-                          {weekDays.map(day => {
-                            const appointment = getAppointmentForSlot(day, time)
-                            return (
-                              <div
-                                key={`${day}-${time}`}
-                                className={`text-sm p-1 rounded ${
-                                  appointment
-                                    ? appointment.status === 'confirmed'
-                                      ? 'bg-green-100'
-                                      : appointment.status === 'pending'
-                                      ? 'bg-yellow-100'
-                                      : 'bg-gray-100'
-                                    : 'border border-dashed'
-                                }`}
-                              >
-                                {appointment && (
-                                  <div className="text-xs">
-                                    {appointment.clientName}
-                                    <br />
-                                    <span className="text-muted-foreground">
-                                      {appointment.status === 'pending' ? 'Pendiente' : 'Confirmada'}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </React.Fragment>
-                      ))}
-                    </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Agenda Semanal</CardTitle>
+                    <CardDescription>
+                      Semana del {format(currentWeek, "d 'de' MMMM", { locale: es })}
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => navigateWeek('prev')}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => navigateWeek('next')}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[600px] w-full rounded-md border">
+                  <div className="grid grid-cols-[80px_repeat(6,1fr)] gap-2 p-4">
+                    <div className="font-medium sticky left-0 bg-background z-10">Hora</div>
+                    {weekDays.map(day => (
+                      <div key={day.toString()} className="font-medium text-center">
+                        <div className="md:hidden">
+                          {format(day, "EEE d", { locale: es })}
+                        </div>
+                        <div className="hidden md:block">
+                          {format(day, "EEEE d", { locale: es })}
+                        </div>
+                      </div>
+                    ))}
+
+                    {timeSlots.map(time => (
+                      <React.Fragment key={time}>
+                        <div className="text-sm py-2 sticky left-0 bg-background z-10">{time}</div>
+                        {weekDays.map(day => {
+                          const appointment = getAppointmentForSlot(day, time)
+                          return (
+                            <div
+                              key={`${day}-${time}`}
+                              className={`text-sm p-1 rounded min-h-[40px] ${
+                                appointment
+                                  ? appointment.status === 'confirmed'
+                                    ? 'bg-green-100'
+                                    : appointment.status === 'pending'
+                                    ? 'bg-yellow-100'
+                                    : 'bg-gray-100'
+                                  : 'border border-dashed'
+                              }`}
+                            >
+                              {appointment && (
+                                <div className="text-xs">
+                                  {appointment.clientName}
+                                  <br />
+                                  <span className="text-muted-foreground">
+                                    {appointment.status === 'pending' ? 'Pendiente' : 'Confirmada'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </ScrollArea>
               </CardContent>
             </Card>
           </TabsContent>
@@ -215,7 +289,7 @@ export default function BarberDashboard() {
                     .map((appointment) => (
                       <div
                         key={appointment.id}
-                        className="flex items-center justify-between p-4 rounded-lg border"
+                        className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-lg border gap-4"
                       >
                         <div className="space-y-1">
                           <p className="font-medium">{appointment.clientName}</p>
@@ -230,18 +304,20 @@ export default function BarberDashboard() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="text-green-600"
+                            className="text-green-600 flex-1 md:flex-none"
                             onClick={() => handleAppointmentAction(appointment.id, 'confirmed')}
                           >
-                            <Check className="h-4 w-4" />
+                            <Check className="h-4 w-4 md:mr-2" />
+                            <span className="hidden md:inline">Confirmar</span>
                           </Button>
                           <Button
                             size="sm"
                             variant="outline"
-                            className="text-red-600"
+                            className="text-red-600 flex-1 md:flex-none"
                             onClick={() => handleAppointmentAction(appointment.id, 'cancelled')}
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-4 w-4 md:mr-2" />
+                            <span className="hidden md:inline">Cancelar</span>
                           </Button>
                         </div>
                       </div>

@@ -25,6 +25,7 @@ export default function BarberProfile() {
   const [user, setUser] = useState<ExtendedUserData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -74,6 +75,7 @@ export default function BarberProfile() {
     if (!file || !user) return
 
     try {
+      setUploading(true)
       const imageUrl = await uploadImage(file)
       setFormData({ ...formData, imageUrl })
       
@@ -89,7 +91,11 @@ export default function BarberProfile() {
       toast.success('Imagen subida correctamente')
     } catch (error) {
       console.error('Error al subir imagen:', error)
-      toast.error('Error al subir la imagen')
+      toast.error(error instanceof Error ? error.message : 'Error al subir la imagen')
+    } finally {
+      setUploading(false)
+      // Limpiar el input de archivo
+      e.target.value = ''
     }
   }
 
@@ -152,14 +158,27 @@ export default function BarberProfile() {
                   onChange={handleImageUpload}
                   className="hidden"
                   id="picture"
+                  disabled={uploading}
                 />
                 <Label
                   htmlFor="picture"
-                  className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+                  className={`cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                    uploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/90'
+                  } bg-primary text-primary-foreground h-10 px-4 py-2`}
                 >
-                  Cambiar Foto
+                  {uploading ? (
+                    <>
+                      <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                      Subiendo...
+                    </>
+                  ) : (
+                    'Cambiar Foto'
+                  )}
                 </Label>
               </div>
+              <p className="text-sm text-muted-foreground">
+                Tamaño máximo: 5MB. Formatos: JPG, PNG, GIF
+              </p>
             </div>
 
             <div className="space-y-2">
