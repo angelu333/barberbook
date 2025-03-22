@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Icons } from '@/components/icons'
 import { toast } from 'sonner'
-import { uploadImage } from '@/lib/storage'
+import { uploadImage } from '@/lib/upload'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface ExtendedUserData extends UserData {
@@ -74,10 +74,21 @@ export default function BarberProfile() {
     if (!file || !user) return
 
     try {
-      const imageUrl = await uploadImage(file, user.id)
+      const imageUrl = await uploadImage(file)
       setFormData({ ...formData, imageUrl })
+      
+      // Actualizar el documento del usuario con la nueva URL
+      const firebaseUser = await getCurrentUser()
+      if (!firebaseUser) throw new Error('No autenticado')
+      
+      await updateDoc(doc(db, 'users', firebaseUser.uid), {
+        imageUrl: imageUrl,
+        updatedAt: new Date().toISOString()
+      })
+
       toast.success('Imagen subida correctamente')
     } catch (error) {
+      console.error('Error al subir imagen:', error)
       toast.error('Error al subir la imagen')
     }
   }
