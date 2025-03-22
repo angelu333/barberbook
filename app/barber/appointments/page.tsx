@@ -1,13 +1,12 @@
 "use client"
 
 import { Calendar } from "@/components/ui/calendar"
-
 import { useState, useEffect } from "react"
 import { Filter, Search } from "lucide-react"
 import { useRouter } from 'next/navigation'
 import { getCurrentUser, getUserData } from '@/lib/auth'
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { db, Appointment, getBarberAppointments } from '@/lib/firebase'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -27,69 +26,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
 import { Icons } from '@/components/icons'
-
-interface Appointment {
-  id: string
-  clientId: string
-  clientName: string
-  date: string
-  time: string
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled'
-}
-
-// Mock data for appointments
-const generateAppointments = () => {
-  const appointments = []
-  const today = new Date()
-
-  // Generate upcoming appointments
-  for (let i = 0; i < 10; i++) {
-    const date = new Date(today)
-    date.setDate(today.getDate() + i)
-
-    const hour = 9 + Math.floor(Math.random() * 9) // 9 AM to 6 PM
-    const minute = Math.floor(Math.random() * 4) * 15 // 0, 15, 30, or 45 minutes
-
-    appointments.push({
-      id: `upcoming-${i}`,
-      clientName: `Cliente ${i + 1}`,
-      clientPhone: "+52 123 456 7890",
-      date: new Date(date.setHours(hour, minute, 0, 0)).toISOString().split('T')[0],
-      time: new Date(date.setHours(hour, minute, 0, 0)).toLocaleTimeString("es-ES", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      duration: 40, // 40 minutes
-      status: Math.random() > 0.3 ? "confirmed" : "pending", // 70% confirmed, 30% pending
-    })
-  }
-
-  // Generate past appointments
-  for (let i = 0; i < 15; i++) {
-    const date = new Date(today)
-    date.setDate(today.getDate() - (i + 1))
-
-    const hour = 9 + Math.floor(Math.random() * 9) // 9 AM to 6 PM
-    const minute = Math.floor(Math.random() * 4) * 15 // 0, 15, 30, or 45 minutes
-
-    appointments.push({
-      id: `past-${i}`,
-      clientName: `Cliente ${i + 11}`,
-      clientPhone: "+52 123 456 7890",
-      date: new Date(date.setHours(hour, minute, 0, 0)).toISOString().split('T')[0],
-      time: new Date(date.setHours(hour, minute, 0, 0)).toLocaleTimeString("es-ES", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      duration: 40, // 40 minutes
-      status: Math.random() > 0.2 ? "completed" : "cancelled", // 80% completed, 20% cancelled
-    })
-  }
-
-  return appointments
-}
-
-const allAppointments = generateAppointments()
+import { Badge } from "@/components/ui/badge"
 
 export default function AppointmentsPage() {
   const router = useRouter()
@@ -98,23 +35,17 @@ export default function AppointmentsPage() {
   const [deleting, setDeleting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming')
-  const [selectedAppointment, setSelectedAppointment] = useState<any | null>(null)
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
 
   const loadAppointments = async () => {
     try {
-      const firebaseUser = await getCurrentUser()
-      if (!firebaseUser) return
+      const user = await getCurrentUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
 
-      const appointmentsQuery = query(
-        collection(db, 'appointments'),
-        where('barberId', '==', firebaseUser.uid)
-      )
-      const appointmentsSnapshot = await getDocs(appointmentsQuery)
-      const appointmentsData = appointmentsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Appointment[]
-      
+      const appointmentsData = await getBarberAppointments(user.uid)
       setAppointments(appointmentsData)
     } catch (error) {
       console.error('Error al cargar citas:', error)
@@ -127,13 +58,13 @@ export default function AppointmentsPage() {
   useEffect(() => {
     async function checkAuth() {
       try {
-        const firebaseUser = await getCurrentUser()
-        if (!firebaseUser) {
+        const user = await getCurrentUser()
+        if (!user) {
           router.push('/login')
           return
         }
 
-        const userData = await getUserData(firebaseUser.uid)
+        const userData = await getUserData(user.uid)
         if (!userData || userData.role !== 'barber') {
           router.push('/login')
           return
@@ -170,6 +101,14 @@ export default function AppointmentsPage() {
     } finally {
       setDeleting(false)
     }
+  }
+
+  const handleAppointmentUpdate = (updatedAppointment: Appointment) => {
+    setAppointments(prev => 
+      prev.map(app => 
+        app.id === updatedAppointment.id ? updatedAppointment : app
+      )
+    )
   }
 
   const filteredAppointments = appointments
@@ -247,99 +186,97 @@ export default function AppointmentsPage() {
               className="w-full"
             />
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant={filter === 'upcoming' ? 'default' : 'outline'}
-              onClick={() => setFilter('upcoming')}
-            >
-              Próximas
-            </Button>
-            <Button
-              variant={filter === 'past' ? 'default' : 'outline'}
-              onClick={() => setFilter('past')}
-            >
-              Pasadas
-            </Button>
-            <Button
-              variant={filter === 'all' ? 'default' : 'outline'}
-              onClick={() => setFilter('all')}
-            >
-              Todas
-            </Button>
-          </div>
+          <Select value={filter} onValueChange={(value: 'all' | 'upcoming' | 'past') => setFilter(value)}>
+            <SelectTrigger className="w-full md:w-[180px]">
+              <SelectValue placeholder="Filtrar por fecha" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las citas</SelectItem>
+              <SelectItem value="upcoming">Próximas citas</SelectItem>
+              <SelectItem value="past">Citas pasadas</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Hora</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAppointments.length === 0 ? (
+        <Card>
+          <CardHeader className="bg-primary/5">
+            <CardTitle>Lista de Citas</CardTitle>
+            <CardDescription>
+              {filteredAppointments.length} citas encontradas
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
-                    No hay citas que mostrar
-                  </TableCell>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Hora</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
-              ) : (
-                filteredAppointments.map((appointment) => (
+              </TableHeader>
+              <TableBody>
+                {filteredAppointments.map((appointment) => (
                   <TableRow key={appointment.id}>
                     <TableCell>{appointment.clientName}</TableCell>
                     <TableCell>
-                      {format(new Date(appointment.date), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
+                      {format(new Date(appointment.date), "d 'de' MMMM", { locale: es })}
                     </TableCell>
                     <TableCell>{appointment.time}</TableCell>
                     <TableCell>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                          appointment.status === 'confirmed'
-                            ? 'bg-green-100 text-green-700'
-                            : appointment.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : appointment.status === 'cancelled'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}
+                      <Badge
+                        variant="outline"
+                        className={
+                          appointment.status === "confirmed"
+                            ? "border-green-500 text-green-500"
+                            : appointment.status === "pending"
+                              ? "border-yellow-500 text-yellow-500"
+                              : appointment.status === "completed"
+                                ? "border-blue-500 text-blue-500"
+                                : "border-red-500 text-red-500"
+                        }
                       >
-                        {appointment.status === 'confirmed'
-                          ? 'Confirmada'
-                          : appointment.status === 'pending'
-                          ? 'Pendiente'
-                          : appointment.status === 'cancelled'
-                          ? 'Cancelada'
-                          : 'Completada'}
-                      </span>
+                        {appointment.status === "confirmed"
+                          ? "Confirmada"
+                          : appointment.status === "pending"
+                            ? "Pendiente"
+                            : appointment.status === "completed"
+                              ? "Completada"
+                              : "Cancelada"}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setSelectedAppointment(appointment)}>
-                        Detalles
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedAppointment(appointment)}
+                      >
+                        Ver detalles
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-
-      {selectedAppointment && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Detalles de la cita</CardTitle>
-            <CardDescription>Información de la cita seleccionada</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AppointmentDetails appointment={selectedAppointment} onClose={() => setSelectedAppointment(null)} />
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
-      )}
+
+        {selectedAppointment && (
+          <Card>
+            <CardHeader className="bg-primary/5">
+              <CardTitle>Detalles de la Cita</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <AppointmentDetails
+                appointment={selectedAppointment}
+                onClose={() => setSelectedAppointment(null)}
+                onUpdate={handleAppointmentUpdate}
+              />
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }

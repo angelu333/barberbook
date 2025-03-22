@@ -11,9 +11,20 @@ interface ScheduleDisplayProps {
   onTimeSelect: (time: string) => void
 }
 
+const dayMapping: Record<string, keyof WeeklySchedule> = {
+  'domingo': 'sunday',
+  'lunes': 'monday',
+  'martes': 'tuesday',
+  'miércoles': 'wednesday',
+  'jueves': 'thursday',
+  'viernes': 'friday',
+  'sábado': 'saturday'
+}
+
 export function ScheduleDisplay({ barberId, selectedDate, onTimeSelect }: ScheduleDisplayProps) {
   const [schedule, setSchedule] = useState<WeeklySchedule | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const unsubscribe = subscribeToBarberSchedule(barberId, (newSchedule) => {
@@ -32,6 +43,14 @@ export function ScheduleDisplay({ barberId, selectedDate, onTimeSelect }: Schedu
     )
   }
 
+  if (error) {
+    return (
+      <div className="text-center p-4 text-destructive">
+        {error}
+      </div>
+    )
+  }
+
   if (!schedule) {
     return (
       <div className="text-center p-4 text-muted-foreground">
@@ -40,13 +59,23 @@ export function ScheduleDisplay({ barberId, selectedDate, onTimeSelect }: Schedu
     )
   }
 
-  const dayOfWeek = format(selectedDate, 'EEEE', { locale: es }) as keyof WeeklySchedule
-  const daySchedule = schedule[dayOfWeek.toLowerCase()]
+  const formattedDay = format(selectedDate, 'EEEE', { locale: es }).toLowerCase()
+  const dayKey = dayMapping[formattedDay]
 
-  if (!daySchedule || !daySchedule.enabled) {
+  if (!dayKey || !schedule[dayKey]) {
     return (
       <div className="text-center p-4 text-muted-foreground">
-        No hay horarios disponibles para este día
+        No hay horarios configurados para este día
+      </div>
+    )
+  }
+
+  const daySchedule = schedule[dayKey]
+
+  if (!daySchedule.enabled) {
+    return (
+      <div className="text-center p-4 text-muted-foreground">
+        No hay atención este día
       </div>
     )
   }
@@ -67,6 +96,14 @@ export function ScheduleDisplay({ barberId, selectedDate, onTimeSelect }: Schedu
   const allTimeSlots = daySchedule.ranges.flatMap(range => 
     generateTimeSlots(range.start, range.end)
   )
+
+  if (allTimeSlots.length === 0) {
+    return (
+      <div className="text-center p-4 text-muted-foreground">
+        No hay horarios disponibles para este día
+      </div>
+    )
+  }
 
   return (
     <div className="grid grid-cols-3 gap-2 p-4">

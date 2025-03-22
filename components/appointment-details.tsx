@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 import { Calendar, Clock, Phone, User, Check, Ban, Scissors } from "lucide-react"
+import { format, parse } from "date-fns"
+import { es } from "date-fns/locale"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -16,17 +18,9 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
-
-interface Appointment {
-  id: string
-  clientName: string
-  clientPhone: string
-  date: Date
-  duration: number
-  status: "confirmed" | "pending" | "cancelled" | "completed"
-  service?: string
-  price?: string
-}
+import { Appointment, updateAppointmentStatus } from "@/lib/firebase"
+import { toast } from "sonner"
+import { Icons } from "@/components/icons"
 
 interface AppointmentDetailsProps {
   appointment: Appointment
@@ -38,55 +32,71 @@ export function AppointmentDetails({ appointment, onClose, onUpdate }: Appointme
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [currentAppointment, setCurrentAppointment] = useState(appointment)
+  const [updating, setUpdating] = useState(false)
 
-  const handleConfirm = () => {
-    // Simular notificación por WhatsApp
-    const updatedAppointment = { ...currentAppointment, status: "confirmed" }
-    setCurrentAppointment(updatedAppointment)
-    setShowConfirmDialog(false)
+  const handleConfirm = async () => {
+    try {
+      setUpdating(true)
+      await updateAppointmentStatus(currentAppointment.id, "confirmed")
+      
+      const updatedAppointment: Appointment = {
+        ...currentAppointment,
+        status: "confirmed"
+      }
+      setCurrentAppointment(updatedAppointment)
+      setShowConfirmDialog(false)
 
-    if (onUpdate) {
-      onUpdate(updatedAppointment)
+      if (onUpdate) {
+        onUpdate(updatedAppointment)
+      }
+
+      toast.success('Cita confirmada correctamente')
+    } catch (error) {
+      console.error('Error al confirmar cita:', error)
+      toast.error('Error al confirmar la cita')
+    } finally {
+      setUpdating(false)
     }
-
-    alert("¡Cita confirmada! Se ha enviado una notificación por WhatsApp al cliente.")
   }
 
-  const handleCancel = () => {
-    // Simular notificación por WhatsApp
-    const updatedAppointment = { ...currentAppointment, status: "cancelled" }
-    setCurrentAppointment(updatedAppointment)
-    setShowCancelDialog(false)
+  const handleCancel = async () => {
+    try {
+      setUpdating(true)
+      await updateAppointmentStatus(currentAppointment.id, "cancelled")
+      
+      const updatedAppointment: Appointment = {
+        ...currentAppointment,
+        status: "cancelled"
+      }
+      setCurrentAppointment(updatedAppointment)
+      setShowCancelDialog(false)
 
-    if (onUpdate) {
-      onUpdate(updatedAppointment)
+      if (onUpdate) {
+        onUpdate(updatedAppointment)
+      }
+
+      toast.success('Cita cancelada correctamente')
+    } catch (error) {
+      console.error('Error al cancelar cita:', error)
+      toast.error('Error al cancelar la cita')
+    } finally {
+      setUpdating(false)
     }
-
-    alert("Cita cancelada. Se ha enviado una notificación por WhatsApp al cliente.")
   }
 
   // Formatear fecha para mostrar
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString("es-ES", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    })
-  }
-
-  // Formatear hora para mostrar
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("es-ES", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+  const formatDate = (dateStr: string) => {
+    const date = parse(dateStr, 'yyyy-MM-dd', new Date())
+    return format(date, "EEEE d 'de' MMMM 'de' yyyy", { locale: es })
   }
 
   // Calcular hora de fin
-  const getEndTime = (date: Date, durationMinutes: number) => {
+  const getEndTime = (timeStr: string, durationMinutes: number) => {
+    const [hours, minutes] = timeStr.split(':').map(Number)
+    const date = new Date()
+    date.setHours(hours, minutes)
     const endTime = new Date(date.getTime() + durationMinutes * 60000)
-    return formatTime(endTime)
+    return format(endTime, 'HH:mm')
   }
 
   return (
@@ -131,21 +141,23 @@ export function AppointmentDetails({ appointment, onClose, onUpdate }: Appointme
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-muted-foreground" />
             <span>
-              {formatTime(currentAppointment.date)} - {getEndTime(currentAppointment.date, currentAppointment.duration)}
+              {currentAppointment.time} - {getEndTime(currentAppointment.time, currentAppointment.duration)}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Phone className="h-4 w-4 text-muted-foreground" />
-            <a
-              href={`https://wa.me/${currentAppointment.clientPhone.replace(/\D/g, "")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-primary transition-colors"
-            >
-              {currentAppointment.clientPhone}
-            </a>
-          </div>
+          {currentAppointment.clientPhone && (
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <a
+                href={`https://wa.me/${currentAppointment.clientPhone.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-primary transition-colors"
+              >
+                {currentAppointment.clientPhone}
+              </a>
+            </div>
+          )}
 
           {currentAppointment.service && (
             <div className="flex items-center gap-2">
@@ -159,16 +171,43 @@ export function AppointmentDetails({ appointment, onClose, onUpdate }: Appointme
 
       <div className="flex flex-wrap justify-end gap-2 pt-2">
         {currentAppointment.status === "pending" && (
-          <Button onClick={() => setShowConfirmDialog(true)} className="flex items-center gap-2">
-            <Check className="h-4 w-4" />
-            Confirmar Cita
+          <Button 
+            onClick={() => setShowConfirmDialog(true)} 
+            className="flex items-center gap-2"
+            disabled={updating}
+          >
+            {updating ? (
+              <>
+                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                Confirmando...
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4" />
+                Confirmar Cita
+              </>
+            )}
           </Button>
         )}
 
         {(currentAppointment.status === "pending" || currentAppointment.status === "confirmed") && (
-          <Button variant="destructive" onClick={() => setShowCancelDialog(true)} className="flex items-center gap-2">
-            <Ban className="h-4 w-4" />
-            Cancelar Cita
+          <Button 
+            variant="destructive" 
+            onClick={() => setShowCancelDialog(true)} 
+            className="flex items-center gap-2"
+            disabled={updating}
+          >
+            {updating ? (
+              <>
+                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                Cancelando...
+              </>
+            ) : (
+              <>
+                <Ban className="h-4 w-4" />
+                Cancelar Cita
+              </>
+            )}
           </Button>
         )}
       </div>
@@ -178,7 +217,7 @@ export function AppointmentDetails({ appointment, onClose, onUpdate }: Appointme
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Cita</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Estás seguro de que deseas confirmar esta cita? Se enviará una notificación por WhatsApp al cliente.
+              ¿Estás seguro de que deseas confirmar esta cita? Se notificará al cliente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -193,7 +232,7 @@ export function AppointmentDetails({ appointment, onClose, onUpdate }: Appointme
           <AlertDialogHeader>
             <AlertDialogTitle>Cancelar Cita</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Estás seguro de que deseas cancelar esta cita? Se enviará una notificación por WhatsApp al cliente.
+              ¿Estás seguro de que deseas cancelar esta cita? Se notificará al cliente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

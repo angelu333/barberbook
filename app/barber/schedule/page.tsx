@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Clock, Save, AlertTriangle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth"
-import { WeeklySchedule, subscribeToBarberSchedule, updateBarberSchedule } from "@/lib/firebase"
+import { WeeklySchedule, defaultSchedule, subscribeToBarberSchedule, updateBarberSchedule } from "@/lib/firebase"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,23 +26,14 @@ const daysOfWeek = [
   { id: "friday", label: "Viernes" },
   { id: "saturday", label: "Sábado" },
   { id: "sunday", label: "Domingo" },
-]
+] as const
 
-// Datos iniciales de horario
-const initialSchedule: WeeklySchedule = {
-  monday: { enabled: true, ranges: [{ start: "09:00", end: "18:00" }] },
-  tuesday: { enabled: true, ranges: [{ start: "09:00", end: "18:00" }] },
-  wednesday: { enabled: true, ranges: [{ start: "09:00", end: "18:00" }] },
-  thursday: { enabled: true, ranges: [{ start: "09:00", end: "18:00" }] },
-  friday: { enabled: true, ranges: [{ start: "09:00", end: "18:00" }] },
-  saturday: { enabled: true, ranges: [{ start: "10:00", end: "15:00" }] },
-  sunday: { enabled: false, ranges: [{ start: "10:00", end: "15:00" }] },
-}
+type DayId = typeof daysOfWeek[number]['id']
 
 export default function SchedulePage() {
   const { toast } = useToast()
   const router = useRouter()
-  const [schedule, setSchedule] = useState<WeeklySchedule>(initialSchedule)
+  const [schedule, setSchedule] = useState<WeeklySchedule>(defaultSchedule)
   const [activeTab, setActiveTab] = useState("weekly")
   const [hasChanges, setHasChanges] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -63,10 +54,7 @@ export default function SchedulePage() {
         unsubscribe = subscribeToBarberSchedule(user.uid, (newSchedule) => {
           if (newSchedule) {
             setSchedule(newSchedule)
-          } else {
-            // Si no existe un horario, crear uno con los valores iniciales
-            updateBarberSchedule(user.uid, initialSchedule)
-            setSchedule(initialSchedule)
+            setHasChanges(false)
           }
           setLoading(false)
         })
@@ -92,11 +80,11 @@ export default function SchedulePage() {
 
   // Detectar cambios en el horario
   useEffect(() => {
-    const scheduleChanged = JSON.stringify(schedule) !== JSON.stringify(initialSchedule)
+    const scheduleChanged = JSON.stringify(schedule) !== JSON.stringify(defaultSchedule)
     setHasChanges(scheduleChanged)
   }, [schedule])
 
-  const handleDayToggle = (day: string) => {
+  const handleDayToggle = (day: DayId) => {
     setSchedule((prev) => ({
       ...prev,
       [day]: {
@@ -106,7 +94,7 @@ export default function SchedulePage() {
     }))
   }
 
-  const handleTimeRangeChange = (day: string, index: number, field: "start" | "end", value: string) => {
+  const handleTimeRangeChange = (day: DayId, index: number, field: "start" | "end", value: string) => {
     setSchedule((prev) => {
       const daySchedule = prev[day]
       const newRanges = [...daySchedule.ranges]
@@ -122,7 +110,7 @@ export default function SchedulePage() {
     })
   }
 
-  const addTimeRange = (day: string) => {
+  const addTimeRange = (day: DayId) => {
     setSchedule((prev) => {
       const daySchedule = prev[day]
       const lastRange = daySchedule.ranges[daySchedule.ranges.length - 1]
@@ -137,7 +125,7 @@ export default function SchedulePage() {
     })
   }
 
-  const removeTimeRange = (day: string, index: number) => {
+  const removeTimeRange = (day: DayId, index: number) => {
     setSchedule((prev) => {
       const daySchedule = prev[day]
       const newRanges = daySchedule.ranges.filter((_, i) => i !== index)
@@ -200,7 +188,7 @@ export default function SchedulePage() {
         </div>
 
         {hasChanges && (
-          <Alert variant="warning">
+          <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Cambios sin guardar</AlertTitle>
             <AlertDescription>
