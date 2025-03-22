@@ -2,107 +2,78 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getCurrentUser, getUserData, UserData } from '@/lib/auth'
-import { doc, getDoc, addDoc, collection } from 'firebase/firestore'
+import { getCurrentUser, getUserData } from '@/lib/auth'
 import { db } from '@/lib/firebase'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Calendar as CalendarIcon, Clock } from 'lucide-react'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { toast } from 'sonner'
+import { doc, getDoc, addDoc, collection } from 'firebase/firestore'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Calendar } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { ScheduleDisplay } from '@/components/schedule-display'
+import { toast } from 'sonner'
+import { Icons } from '@/components/icons'
 
-interface Barber extends UserData {
-  id: string
-  experience: number
-  specialties: string[]
-  description: string
-  imageUrl?: string
+interface BookingPageProps {
+  params: {
+    barberId: string
+  }
 }
 
-const timeSlots = [
-  '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-  '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-  '15:00', '15:30', '16:00', '16:30', '17:00', '17:30'
-]
-
-export default function BookAppointment({ params }: { params: { barberId: string } }) {
+export default function BookingPage({ params }: BookingPageProps) {
   const router = useRouter()
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  const [selectedTime, setSelectedTime] = useState<string | null>(null)
+  const [barberData, setBarberData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [barber, setBarber] = useState<Barber | null>(null)
-  const [date, setDate] = useState<Date>()
-  const [time, setTime] = useState<string>('')
+  const [booking, setBooking] = useState(false)
 
   useEffect(() => {
-    async function loadBarber() {
+    async function loadBarberData() {
       try {
-        // Verificar cliente autenticado
-        const firebaseUser = await getCurrentUser()
-        if (!firebaseUser) {
-          router.push('/login')
-          return
-        }
-
-        const userData = await getUserData(firebaseUser.uid)
-        if (!userData || userData.role !== 'client') {
-          router.push('/login')
-          return
-        }
-
-        // Cargar datos del barbero
         const barberDoc = await getDoc(doc(db, 'users', params.barberId))
         if (!barberDoc.exists()) {
           toast.error('Barbero no encontrado')
           router.push('/client/dashboard')
           return
         }
-
-        setBarber({
-          id: barberDoc.id,
-          ...barberDoc.data()
-        } as Barber)
+        setBarberData(barberDoc.data())
       } catch (error) {
-        console.error('Error al cargar barbero:', error)
-        toast.error('Error al cargar la información del barbero')
-        router.push('/client/dashboard')
+        console.error('Error al cargar datos del barbero:', error)
+        toast.error('Error al cargar datos del barbero')
       } finally {
         setLoading(false)
       }
     }
 
-    loadBarber()
-  }, [router, params.barberId])
+    loadBarberData()
+  }, [params.barberId, router])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!date || !time || !barber) return
-
-    setSaving(true)
+  const handleBooking = async () => {
     try {
-      const firebaseUser = await getCurrentUser()
-      if (!firebaseUser) throw new Error('No autenticado')
+      setBooking(true)
+      const user = await getCurrentUser()
+      if (!user) {
+        throw new Error('No autenticado')
+      }
 
-      const userData = await getUserData(firebaseUser.uid)
-      if (!userData) throw new Error('Usuario no encontrado')
+      const userData = await getUserData(user.uid)
+      if (!userData) {
+        throw new Error('No se encontraron datos del usuario')
+      }
 
-      // Crear la cita
-      await addDoc(collection(db, 'appointments'), {
-        barberId: barber.id,
-        barberName: barber.name,
-        clientId: firebaseUser.uid,
+      const appointment = {
+        barberId: params.barberId,
+        barberName: barberData.name,
+        clientId: user.uid,
         clientName: userData.name,
-        date: format(date, 'yyyy-MM-dd'),
-        time: time,
+        date: format(selectedDate, 'yyyy-MM-dd'),
+        time: selectedTime,
         status: 'pending',
         createdAt: new Date().toISOString()
-      })
+      }
+
+      await addDoc(collection(db, 'appointments'), appointment)
 
       toast.success('Cita agendada correctamente')
       router.push('/client/dashboard')
@@ -110,7 +81,7 @@ export default function BookAppointment({ params }: { params: { barberId: string
       console.error('Error al agendar cita:', error)
       toast.error('Error al agendar la cita')
     } finally {
-      setSaving(false)
+      setBooking(false)
     }
   }
 
@@ -125,91 +96,79 @@ export default function BookAppointment({ params }: { params: { barberId: string
     )
   }
 
-  if (!barber) return null
-
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="max-w-2xl mx-auto">
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-4 p-6">
-            <Avatar className="h-16 w-16">
-              <AvatarImage src={barber.imageUrl} />
-              <AvatarFallback>{barber.name?.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div>
-              <CardTitle>Agendar cita con {barber.name}</CardTitle>
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Agendar Cita</h1>
+          <p className="text-muted-foreground">
+            con {barberData.name}
+          </p>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Selecciona una fecha</CardTitle>
               <CardDescription>
-                {barber.experience} años de experiencia
+                Elige el día para tu cita
               </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label>Fecha de la cita</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={`w-full justify-start text-left font-normal ${!date && "text-muted-foreground"}`}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {date ? format(date, "PPP", { locale: es }) : "Selecciona una fecha"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={date}
-                      onSelect={setDate}
-                      initialFocus
-                      disabled={(date) => 
-                        date < new Date() || 
-                        date.getDay() === 0 // Domingo
-                      }
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+            </CardHeader>
+            <CardContent>
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => {
+                  if (date) {
+                    setSelectedDate(date)
+                    setSelectedTime(null)
+                  }
+                }}
+                locale={es}
+                disabled={(date) => date < new Date() || date > new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)}
+                className="rounded-md border"
+              />
+            </CardContent>
+          </Card>
 
-              <div className="space-y-2">
-                <Label>Hora de la cita</Label>
-                <Select onValueChange={setTime}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una hora">
-                      <div className="flex items-center">
-                        <Clock className="mr-2 h-4 w-4" />
-                        {time || "Selecciona una hora"}
-                      </div>
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timeSlots.map((slot) => (
-                      <SelectItem key={slot} value={slot}>
-                        {slot}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Selecciona una hora</CardTitle>
+              <CardDescription>
+                Horarios disponibles para {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScheduleDisplay
+                barberId={params.barberId}
+                selectedDate={selectedDate}
+                onTimeSelect={setSelectedTime}
+              />
+            </CardContent>
+          </Card>
+        </div>
 
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={!date || !time || saving}
-              >
-                {saving ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Agendando...
-                  </>
-                ) : (
-                  'Confirmar Cita'
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <div className="flex justify-end gap-4">
+          <Button
+            variant="outline"
+            onClick={() => router.push('/client/dashboard')}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleBooking}
+            disabled={!selectedTime || booking}
+          >
+            {booking ? (
+              <>
+                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                Agendando...
+              </>
+            ) : (
+              'Agendar Cita'
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   )
