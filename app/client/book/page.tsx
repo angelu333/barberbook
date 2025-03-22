@@ -35,26 +35,26 @@ export default function BookAppointmentPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Reservar Cita</CardTitle>
-          <CardDescription>
+    <div className="container mx-auto px-4 py-6 md:py-8 lg:max-w-4xl">
+      <Card className="shadow-lg">
+        <CardHeader className="space-y-1 md:space-y-2">
+          <CardTitle className="text-2xl md:text-3xl font-bold">Reservar Cita</CardTitle>
+          <CardDescription className="text-base md:text-lg">
             Selecciona el día y la hora para tu cita
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-6">
-          <div className="grid gap-2">
+        <CardContent className="grid gap-6 md:gap-8">
+          <div className="grid gap-4">
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-full justify-start text-left font-normal",
+                    "w-full h-12 md:h-14 justify-start text-left font-normal text-base md:text-lg",
                     !date && "text-muted-foreground"
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <CalendarIcon className="mr-3 h-5 w-5 md:h-6 md:w-6" />
                   {date ? (
                     format(date, "EEEE d 'de' MMMM 'de' yyyy", {
                       locale: es,
@@ -72,28 +72,37 @@ export default function BookAppointmentPage() {
                   initialFocus
                   disabled={(date) => date < new Date()}
                   locale={es}
+                  className="rounded-md border shadow-md"
                 />
               </PopoverContent>
             </Popover>
           </div>
           {date && (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {availableTimes.map((time) => (
-                <Button
-                  key={time}
-                  variant={selectedTime === time ? "default" : "outline"}
-                  className="w-full"
-                  onClick={() => setSelectedTime(time)}
-                >
-                  {time}
-                </Button>
-              ))}
+            <div className="space-y-4">
+              <h3 className="text-base md:text-lg font-medium text-muted-foreground">
+                Horarios disponibles
+              </h3>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {availableTimes.map((time) => (
+                  <Button
+                    key={time}
+                    variant={selectedTime === time ? "default" : "outline"}
+                    className={cn(
+                      "w-full h-12 md:h-14 text-base md:text-lg transition-all",
+                      selectedTime === time && "scale-[1.02] font-medium"
+                    )}
+                    onClick={() => setSelectedTime(time)}
+                  >
+                    {time}
+                  </Button>
+                ))}
+              </div>
             </div>
           )}
         </CardContent>
-        <CardFooter>
+        <CardFooter className="px-6 py-4 md:px-8 md:py-6">
           <Button
-            className="w-full"
+            className="w-full h-12 md:h-14 text-base md:text-lg font-medium"
             disabled={!date || !selectedTime}
             onClick={() => setShowConfirmation(true)}
           >
