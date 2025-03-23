@@ -25,10 +25,10 @@ export default function ClientLayout({
       active: pathname === "/client/dashboard",
     },
     {
-      href: "/client/book",
-      label: "Reservar",
+      href: "/client/appointments",
+      label: "Mis Citas",
       icon: Calendar,
-      active: pathname === "/client/book",
+      active: pathname === "/client/appointments",
     },
     {
       href: "/client/search",
