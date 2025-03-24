@@ -3,15 +3,28 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser, getUserData, UserData } from '@/lib/auth'
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc, deleteDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Icons } from '@/components/icons'
 import { toast } from 'sonner'
-import { uploadImage } from '@/lib/storage'
+import { uploadImage } from '@/lib/cloudinary'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { deleteUser } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
 
 interface ExtendedUserData extends UserData {
   id: string
@@ -23,6 +36,7 @@ export default function ClientProfile() {
   const [user, setUser] = useState<ExtendedUserData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -66,10 +80,21 @@ export default function ClientProfile() {
     if (!file || !user) return
 
     try {
-      const imageUrl = await uploadImage(file, user.id)
+      const imageUrl = await uploadImage(file)
       setFormData({ ...formData, imageUrl })
+      
+      // Actualizar la URL de la imagen en Firestore
+      const firebaseUser = await getCurrentUser()
+      if (firebaseUser) {
+        await updateDoc(doc(db, 'users', firebaseUser.uid), {
+          imageUrl: imageUrl,
+          updatedAt: new Date().toISOString()
+        })
+      }
+      
       toast.success('Imagen subida correctamente')
     } catch (error) {
+      console.error('Error al subir imagen:', error)
       toast.error('Error al subir la imagen')
     }
   }
@@ -97,6 +122,29 @@ export default function ClientProfile() {
       toast.error('Error al actualizar el perfil')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDeleteProfile = async () => {
+    setDeleting(true)
+    try {
+      const firebaseUser = await getCurrentUser()
+      if (!firebaseUser) {
+        throw new Error('No se encontró usuario')
+      }
+
+      // Eliminar documento del usuario en Firestore
+      await deleteDoc(doc(db, 'users', firebaseUser.uid))
+      
+      // Eliminar usuario de Firebase Auth
+      await deleteUser(firebaseUser)
+      
+      toast.success('Perfil eliminado correctamente')
+      router.push('/')
+    } catch (error) {
+      console.error('Error al eliminar perfil:', error)
+      toast.error('Error al eliminar el perfil')
+      setDeleting(false)
     }
   }
 
@@ -185,6 +233,42 @@ export default function ClientProfile() {
               Guardar Cambios
             </Button>
           </form>
+
+          <div className="mt-8 pt-6 border-t">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="w-full">
+                  Eliminar Perfil
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción no se puede deshacer. Se eliminará permanentemente tu cuenta
+                    y todos tus datos asociados.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteProfile}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={deleting}
+                  >
+                    {deleting ? (
+                      <>
+                        <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                        Eliminando...
+                      </>
+                    ) : (
+                      'Sí, eliminar mi cuenta'
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
       </div>
     </div>
