@@ -20,8 +20,19 @@ export const uploadImage = async (file: File) => {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET)
+    
+    // Agregar configuraciones adicionales
+    formData.append('filename_override', file.name)
+    formData.append('use_filename', 'true')
+    formData.append('unique_filename', 'true')
+    formData.append('resource_type', 'image')
 
-    console.log('Iniciando subida a Cloudinary...')
+    console.log('Iniciando subida a Cloudinary...', {
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: file.size
+    })
+
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
       {
@@ -30,14 +41,18 @@ export const uploadImage = async (file: File) => {
       }
     )
 
+    const data = await response.json()
+
     if (!response.ok) {
-      const errorData = await response.json()
-      console.error('Error de Cloudinary:', errorData)
-      throw new Error(errorData.error?.message || 'Error al subir la imagen')
+      console.error('Error de Cloudinary:', data)
+      throw new Error(data.error?.message || 'Error al subir la imagen')
     }
 
-    const data = await response.json()
-    console.log('Imagen subida exitosamente:', data.secure_url)
+    console.log('Imagen subida exitosamente:', {
+      url: data.secure_url,
+      publicId: data.public_id
+    })
+    
     return data.secure_url
   } catch (error) {
     console.error('Error al subir imagen a Cloudinary:', error)
